@@ -76,33 +76,33 @@ public:
         qubits.resize(numQubits, Qubit());
     }
 
-    // Apply a single-qubit gate to a specific qubit
     void applyGateToQubit(const Matrix& gate, int qubitIndex) {
         if (qubitIndex >= 0 && qubitIndex < numQubits) {
             qubits[qubitIndex].applyGate(gate);
         } else {
-            cout << "Error: Invalid qubit index!" << endl;
+            cerr << "Error: Invalid qubit index!" << endl;
         }
     }
 
-    // Apply a multi-qubit controlled gate
     void applyControlledGate(const Matrix& gate, int controlQubit, int targetQubit) {
-        if (measureQubit(controlQubit) == 1) {
-            applyGateToQubit(gate, targetQubit);
+        if (controlQubit >= 0 && controlQubit < numQubits && targetQubit >= 0 && targetQubit < numQubits) {
+            if (measureQubit(controlQubit) == 1) {
+                applyGateToQubit(gate, targetQubit);
+            }
+        } else {
+            cerr << "Error: Invalid qubit index for controlled gate!" << endl;
         }
     }
 
-    // Measure a specific qubit and collapse its state
     int measureQubit(int qubitIndex) {
         if (qubitIndex >= 0 && qubitIndex < numQubits) {
             return qubits[qubitIndex].measure();
         } else {
-            cout << "Error: Invalid qubit index!" << endl;
+            cerr << "Error: Invalid qubit index!" << endl;
             return -1;
         }
     }
 
-    // Measure all qubits
     vector<int> measureAll() {
         vector<int> results;
         for (int i = 0; i < numQubits; ++i) {
@@ -111,7 +111,6 @@ public:
         return results;
     }
 
-    // Display the state of the entire quantum register
     void displayCircuitState() const {
         for (int i = 0; i < numQubits; ++i) {
             cout << "Qubit " << i + 1 << ": ";
@@ -119,7 +118,6 @@ public:
         }
     }
 
-    // Get the overall state vector
     vector<complex<double>> getStateVector() const {
         vector<complex<double>> state(1 << numQubits, {0, 0});
         state[0] = 1; // Start with |0...0>
@@ -137,14 +135,21 @@ public:
         return state;
     }
 
+    // Apply Toffoli gate (CCNOT) for multi-qubit operations
+    void applyToffoli(int controlQubit1, int controlQubit2, int targetQubit) {
+        if (measureQubit(controlQubit1) == 1 && measureQubit(controlQubit2) == 1) {
+            applyGateToQubit(PauliX, targetQubit);
+        }
+    }
+
 private:
     int numQubits;
     vector<Qubit> qubits;
 };
 
 int main() {
-    // Create a quantum circuit with 2 qubits
-    QuantumCircuit qc(2);
+    // Create a quantum circuit with 3 qubits
+    QuantumCircuit qc(3);
 
     cout << "Initial state of the quantum circuit:\n";
     qc.displayCircuitState();
@@ -159,6 +164,12 @@ int main() {
     qc.applyControlledGate(PauliX, 0, 1);
 
     cout << "\nAfter applying CNOT (control: Qubit 1, target: Qubit 2):\n";
+    qc.displayCircuitState();
+
+    // Apply Toffoli gate (CCNOT) between Qubit 1 and Qubit 2 (controls) and Qubit 3 (target)
+    qc.applyToffoli(0, 1, 2);
+
+    cout << "\nAfter applying Toffoli gate (controls: Qubit 1, Qubit 2; target: Qubit 3):\n";
     qc.displayCircuitState();
 
     // Measure both qubits
