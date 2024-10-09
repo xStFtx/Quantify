@@ -9,10 +9,10 @@ using namespace std;
 
 const complex<double> I(0, 1); // Imaginary unit
 
-// Matrix type for quantum gates (2x2 for single qubit, larger for multi-qubit)
+// Matrix type for quantum gates
 typedef vector<vector<complex<double>>> Matrix;
 
-// Qubit class, now extended for multi-qubit systems
+// Qubit class for individual qubit representation
 class Qubit {
 public:
     Qubit(complex<double> alpha = {1, 0}, complex<double> beta = {0, 0})
@@ -20,7 +20,6 @@ public:
         normalize();
     }
 
-    // Apply a 2x2 unitary matrix (quantum gate) to the qubit state
     void applyGate(const Matrix& gate) {
         complex<double> newAlpha = gate[0][0] * alpha + gate[0][1] * beta;
         complex<double> newBeta = gate[1][0] * alpha + gate[1][1] * beta;
@@ -29,19 +28,18 @@ public:
         normalize();
     }
 
-    // Measure the qubit's state probabilistically, collapsing to |0> or |1>
     int measure() {
-        double prob0 = norm(alpha); // |alpha|^2 gives probability of measuring |0>
+        double prob0 = norm(alpha);
         random_device rd;
         mt19937 gen(rd());
         uniform_real_distribution<> dist(0.0, 1.0);
 
         if (dist(gen) < prob0) {
-            alpha = {1, 0};  // Collapse to |0>
+            alpha = {1, 0};
             beta = {0, 0};
             return 0;
         } else {
-            alpha = {0, 0};  // Collapse to |1>
+            alpha = {0, 0};
             beta = {1, 0};
             return 1;
         }
@@ -50,6 +48,9 @@ public:
     void displayState() const {
         cout << alpha << "|0> + " << beta << "|1>" << endl;
     }
+
+    complex<double> getAlpha() const { return alpha; }
+    complex<double> getBeta() const { return beta; }
 
 private:
     complex<double> alpha, beta;
@@ -61,28 +62,30 @@ private:
     }
 };
 
-// Basic quantum gates as 2x2 matrices
+// Basic quantum gates as matrices
 Matrix PauliX = {{0, 1}, {1, 0}}; // Quantum NOT
 Matrix PauliY = {{0, -I}, {I, 0}};
 Matrix PauliZ = {{1, 0}, {0, -1}};
 Matrix Hadamard = {{1 / sqrt(2.0), 1 / sqrt(2.0)}, {1 / sqrt(2.0), -1 / sqrt(2.0)}};
 Matrix Identity = {{1, 0}, {0, 1}};
 
-// Class to represent a quantum circuit with entanglement and tensor products
+// Class to represent a quantum circuit
 class QuantumCircuit {
 public:
     QuantumCircuit(int numQubits) : numQubits(numQubits) {
-        qubits.resize(numQubits, Qubit({1, 0}, {0, 0})); // Initialize all qubits to |0>
+        qubits.resize(numQubits, Qubit());
     }
 
     // Apply a single-qubit gate to a specific qubit
     void applyGateToQubit(const Matrix& gate, int qubitIndex) {
         if (qubitIndex >= 0 && qubitIndex < numQubits) {
             qubits[qubitIndex].applyGate(gate);
+        } else {
+            cout << "Error: Invalid qubit index!" << endl;
         }
     }
 
-    // Apply a two-qubit controlled gate (e.g., CNOT, CZ)
+    // Apply a multi-qubit controlled gate
     void applyControlledGate(const Matrix& gate, int controlQubit, int targetQubit) {
         if (measureQubit(controlQubit) == 1) {
             applyGateToQubit(gate, targetQubit);
@@ -93,11 +96,13 @@ public:
     int measureQubit(int qubitIndex) {
         if (qubitIndex >= 0 && qubitIndex < numQubits) {
             return qubits[qubitIndex].measure();
+        } else {
+            cout << "Error: Invalid qubit index!" << endl;
+            return -1;
         }
-        return -1;
     }
 
-    // Measure all qubits in the circuit
+    // Measure all qubits
     vector<int> measureAll() {
         vector<int> results;
         for (int i = 0; i < numQubits; ++i) {
@@ -114,27 +119,28 @@ public:
         }
     }
 
-private:
-    int numQubits;
-    vector<Qubit> qubits; // A vector of qubits representing the quantum register
-};
+    // Get the overall state vector
+    vector<complex<double>> getStateVector() const {
+        vector<complex<double>> state(1 << numQubits, {0, 0});
+        state[0] = 1; // Start with |0...0>
 
-// Helper functions for quantum tensor products
-Matrix tensorProduct(const Matrix& A, const Matrix& B) {
-    Matrix result(A.size() * B.size(), vector<complex<double>>(A[0].size() * B[0].size()));
-
-    for (size_t i = 0; i < A.size(); ++i) {
-        for (size_t j = 0; j < A[0].size(); ++j) {
-            for (size_t k = 0; k < B.size(); ++k) {
-                for (size_t l = 0; l < B[0].size(); ++l) {
-                    result[i * B.size() + k][j * B[0].size() + l] = A[i][j] * B[k][l];
+        for (int i = 0; i < numQubits; ++i) {
+            auto temp = state; // Copy current state
+            for (int j = 0; j < (1 << numQubits); ++j) {
+                if (j & (1 << i)) {
+                    state[j] = qubits[i].getBeta() * temp[j ^ (1 << i)];
+                } else {
+                    state[j] = qubits[i].getAlpha() * temp[j];
                 }
             }
         }
+        return state;
     }
 
-    return result;
-}
+private:
+    int numQubits;
+    vector<Qubit> qubits;
+};
 
 int main() {
     // Create a quantum circuit with 2 qubits
@@ -161,6 +167,14 @@ int main() {
     cout << "\nMeasurement results: ";
     for (int result : results) {
         cout << result << " ";
+    }
+    cout << endl;
+
+    // Display the overall state vector
+    vector<complex<double>> stateVector = qc.getStateVector();
+    cout << "\nOverall state vector:\n";
+    for (const auto& amp : stateVector) {
+        cout << setw(10) << amp << " ";
     }
     cout << endl;
 
